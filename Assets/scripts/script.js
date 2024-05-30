@@ -1,147 +1,140 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const grid = document.getElementById('game');
-    const retryButton = document.getElementById('retry');
+$(document).ready(function () {
+    const $grid = $('#game');
+    const $retryButton = $('#retry');
     const difficulty = {
         easy: { width: 5, height: 5, minesCount: 5 },
         medium: { width: 10, height: 10, minesCount: 20 },
-        hard: { width: 20, height: 20, minesCount: 50 },
+        hard: { width: 15, height: 15, minesCount: 50 },
     };
-    let width, height, minesCount;
-    let cells = [];
-    let isGameOver = false;
-    let flags = 0;
-    let squaresRevealed = 0;
+    let width, height, minesCount, cells, isGameOver, flags, squaresRevealed, isFirstClick;
 
-    window.startGame = function (level) {
-        const config = difficulty[level];
-        width = config.width;
-        height = config.height;
-        minesCount = config.minesCount;
-        grid.style.gridTemplateColumns = `repeat(${width}, 40px)`;
-        grid.innerHTML = '';
-        retryButton.style.display = 'none';
+    function initializeGame() {
+        $grid.css('gridTemplateColumns', `repeat(${width}, 40px)`).empty();
+        $retryButton.hide();
         cells = [];
         isGameOver = false;
         flags = 0;
         squaresRevealed = 0;
-        createBoard();
-    };
+        isFirstClick = true;
+        createEmptyBoard();
+    }
 
-    function createBoard() {
-        const minesArray = Array(minesCount).fill('mine');
-        const emptyArray = Array(width * height - minesCount).fill('empty');
-        const gameArray = emptyArray.concat(minesArray).sort(() => Math.random() - 0.5);
+    function startGame(level) {
+        ({ width, height, minesCount } = difficulty[level]);
+        initializeGame();
+    }
 
+    window.startGame = startGame;
+
+    function createEmptyBoard() {
         for (let i = 0; i < width * height; i++) {
-            const cell = document.createElement('div');
-            cell.setAttribute('id', i);
-            cell.classList.add('cell');
-            cell.classList.add(gameArray[i]);
-            grid.appendChild(cell);
-            cells.push(cell);
+            const $cell = $('<div>', {
+                id: i,
+                class: 'cell empty'
+            }).on('click', () => clickCell($cell))
+              .on('contextmenu', (e) => { e.preventDefault(); addFlag($cell); });
 
-            cell.addEventListener('click', () => clickCell(cell));
-            cell.oncontextmenu = (e) => {
-                e.preventDefault();
-                addFlag(cell);
-            };
-        }
-
-        for (let i = 0; i < cells.length; i++) {
-            const isLeftEdge = (i % width === 0);
-            const isRightEdge = (i % width === width - 1);
-
-            if (cells[i].classList.contains('empty')) {
-                let total = 0;
-                if (i > 0 && !isLeftEdge && cells[i - 1].classList.contains('mine')) total++;
-                if (i > width - 1 && !isRightEdge && cells[i + 1 - width].classList.contains('mine')) total++;
-                if (i > width && cells[i - width].classList.contains('mine')) total++;
-                if (i > width + 1 && !isLeftEdge && cells[i - 1 - width].classList.contains('mine')) total++;
-                if (i < width * height - 1 && !isRightEdge && cells[i + 1].classList.contains('mine')) total++;
-                if (i < width * height - width && !isLeftEdge && cells[i - 1 + width].classList.contains('mine')) total++;
-                if (i < width * height - width - 2 && !isRightEdge && cells[i + 1 + width].classList.contains('mine')) total++;
-                if (i < width * height - width - 1 && cells[i + width].classList.contains('mine')) total++;
-                cells[i].setAttribute('data', total);
-            }
+            $grid.append($cell);
+            cells.push($cell);
         }
     }
 
-    function clickCell(cell) {
-        if (isGameOver) return;
-        if (cell.classList.contains('revealed') || cell.classList.contains('flag')) return;
+    function generateMines(excludeIndex) {
+        const minePositions = new Set();
+        while (minePositions.size < minesCount) {
+            const index = Math.floor(Math.random() * width * height);
+            if (index !== excludeIndex) {
+                minePositions.add(index);
+            }
+        }
 
-        if (cell.classList.contains('mine')) {
-            gameOver(cell);
+        minePositions.forEach(index => {
+            cells[index].removeClass('empty').addClass('mine');
+        });
+
+        cells.forEach(($cell, i) => {
+            if ($cell.hasClass('empty')) {
+                $cell.attr('data', getAdjacentMines(i));
+            }
+        });
+    }
+
+    function getAdjacentMines(i) {
+        const directions = [
+            -1, 1, -width, width, -width - 1, -width + 1, width - 1, width + 1
+        ];
+        const isLeftEdge = (i % width === 0);
+        const isRightEdge = (i % width === width - 1);
+
+        return directions.reduce((count, dir) => {
+            const idx = i + dir;
+            if (
+                idx >= 0 &&
+                idx < width * height &&
+                !((dir === -1 || dir === -width - 1 || dir === width - 1) && isLeftEdge) &&
+                !((dir === 1 || dir === -width + 1 || dir === width + 1) && isRightEdge)
+            ) {
+                return count + (cells[idx].hasClass('mine') ? 1 : 0);
+            }
+            return count;
+        }, 0);
+    }
+
+    function clickCell($cell) {
+        if (isGameOver || $cell.hasClass('revealed') || $cell.hasClass('flag')) return;
+
+        if (isFirstClick) {
+            generateMines(parseInt($cell.attr('id')));
+            isFirstClick = false;
+        }
+
+        if ($cell.hasClass('mine')) {
+            gameOver($cell);
         } else {
-            const total = cell.getAttribute('data');
-            if (total != 0) {
-                cell.classList.add('revealed');
-                cell.innerHTML = total;
-                squaresRevealed++;
-                checkForWin();
-                return;
+            const total = $cell.attr('data');
+            $cell.addClass('revealed').text(total != 0 ? total : '');
+            squaresRevealed++;
+            if (total == 0) revealAdjacentCells(parseInt($cell.attr('id')));
+            checkForWin();
+        }
+    }
+
+    function revealAdjacentCells(id) {
+        const directions = [-1, 1, -width, width, -width - 1, -width + 1, width - 1, width + 1];
+        directions.forEach(dir => {
+            const idx = id + dir;
+            if (idx >= 0 && idx < width * height && !cells[idx].hasClass('revealed')) {
+                clickCell(cells[idx]);
             }
-            revealCell(cell);
-        }
-        cell.classList.add('revealed');
-        squaresRevealed++;
-        checkForWin();
+        });
     }
 
-    function revealCell(cell) {
-        const id = parseInt(cell.id);
-        const isLeftEdge = (id % width === 0);
-        const isRightEdge = (id % width === width - 1);
-
-        setTimeout(() => {
-            if (id > 0 && !isLeftEdge) clickCell(cells[id - 1]);
-            if (id > width - 1 && !isRightEdge) clickCell(cells[id + 1 - width]);
-            if (id > width) clickCell(cells[id - width]);
-            if (id > width + 1 && !isLeftEdge) clickCell(cells[id - 1 - width]);
-            if (id < width * height - 1 && !isRightEdge) clickCell(cells[id + 1]);
-            if (id < width * height - width && !isLeftEdge) clickCell(cells[id - 1 + width]);
-            if (id < width * height - width - 2 && !isRightEdge) clickCell(cells[id + 1 + width]);
-            if (id < width * height - width - 1) clickCell(cells[id + width]);
-        }, 10);
-    }
-
-    function addFlag(cell) {
-        if (isGameOver) return;
-        if (!cell.classList.contains('revealed') && cell.classList.contains('flag')) {
-            cell.classList.remove('flag');
-            cell.innerHTML = '';
-            flags--;
-        } else if (!cell.classList.contains('revealed')) {
-            cell.classList.add('flag');
-            cell.innerHTML = '🚩';
-            flags++;
-        }
+    function addFlag($cell) {
+        if (isGameOver || $cell.hasClass('revealed')) return;
+        $cell.toggleClass('flag').html($cell.hasClass('flag') ? '🚩' : '');
+        flags += $cell.hasClass('flag') ? 1 : -1;
         checkForWin();
     }
 
     function checkForWin() {
-        let match = 0;
-        for (let i = 0; i < cells.length; i++) {
-            if (cells[i].classList.contains('flag') && cells[i].classList.contains('mine')) {
-                match++;
-            }
-        }
-        if (match === minesCount && squaresRevealed + minesCount === width * height) {
+        const matches = cells.filter($cell => $cell.hasClass('flag') && $cell.hasClass('mine')).length;
+        if (matches === minesCount && squaresRevealed + minesCount === width * height) {
             alert('Congratulations! You won!');
             isGameOver = true;
         }
     }
 
-    function gameOver(cell) {
+    function gameOver($cell) {
         isGameOver = true;
-        cell.classList.add('mine', 'active');
-        cells.forEach(cell => {
-            if (cell.classList.contains('mine')) {
-                cell.innerHTML = '💣';
-                cell.classList.add('revealed', 'active');
+        cells.forEach($cell => {
+            if ($cell.hasClass('mine')) {
+                $cell.html('💣').removeClass('empty').addClass('revealed');
             }
         });
+        $cell.addClass('active');
         alert('Game Over! You clicked on a mine.');
-        retryButton.style.display = 'block';
+        $retryButton.show();
     }
+
+    window.retryGame = () => startGame('easy');  
 });

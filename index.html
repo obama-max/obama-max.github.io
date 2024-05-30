@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minesweeper</title>
-    <link rel="stylesheet" href="./Assets/styles/style.css">
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="./script.js"></script>
 </head>
 <body>
     <h1>Minesweeper</h1>
@@ -13,12 +15,11 @@
         <button onclick="startGame('easy')">Easy</button>
         <button onclick="startGame('medium')">Medium</button>
         <button onclick="startGame('hard')">Hard</button>
+
     </div>
-
-    <div id="game"></div>
     
-    <button id="retry" style="display: none;" onclick="retryGame()">Retry</button>
+    <div id="game"></div>
 
-    <script src="./Assets/scripts/script.js"></script>
+    <button id="retry" style="display: none;" onclick="retryGame()">Retry</button>
 </body>
 </html>
