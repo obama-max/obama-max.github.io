@@ -1,0 +1,46 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+h1{
+    margin-bottom: 2.5rem;
+}
+
+#game {
+    display: grid;
+    gap: 2px;
+}
+
+#difficulty {
+    margin-bottom: 2.5rem;
+}
+
+#retry{
+    margin-top: 2.5rem;
+}
+.cell {
+    width: 40px;
+    height: 40px;
+    background-color: gray;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.cell.revealed {
+    background-color: #eee;
+}
+
+.cell.mine.active {
+    background-color: red;
+}
+.cell.flag {
+    background-color: yellow;
+}
